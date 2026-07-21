@@ -449,13 +449,16 @@ if uploaded:
 
         # ── CRITICAL BANNER ──
         if n_critical > 0:
-            crit_customers = ", ".join(flags[flags["Risk Level"] == "Critical"]["Customer"].tolist())
+            crit_flags = flags[flags["Risk Level"] == "Critical"]
+            crit_customers = ", ".join(crit_flags["Customer"].unique().tolist())
+            crit_details = " · ".join([f"{r['Customer']}: {r['Description']}" for _, r in crit_flags.iterrows()])
             st.markdown(f"""
             <div class="bp-critical-banner">
                 <div class="bp-critical-icon">🚨</div>
                 <div>
                     <div class="bp-critical-title">{n_critical} Critical Flag{"s" if n_critical > 1 else ""} — Immediate Action Required</div>
-                    <div class="bp-critical-sub">{crit_customers}</div>
+                    <div class="bp-critical-sub" style="margin-bottom:0.25rem;">{crit_customers}</div>
+                    <div style="font-size:0.78rem;color:#991b1b;margin-top:0.15rem;">{crit_details}</div>
                 </div>
             </div>""", unsafe_allow_html=True)
 
