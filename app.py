@@ -424,12 +424,30 @@ if not os.environ.get("ANTHROPIC_API_KEY"):
             st.success("Key set.")
 
 # ── UPLOAD ────────────────────────────────────────────────────────────────────
-uploaded = st.file_uploader("Upload Monthly Billing File (.xlsx)", type=["xlsx"])
-st.markdown('<div class="bp-upload-hint">Standard GoFleet / ZenduIT monthly billing export</div>', unsafe_allow_html=True)
+data_source = st.radio("Select data source", options=["Upload Excel File", "Connect to Zoho Books"], horizontal=True)
 
-if uploaded:
+if data_source == "Upload Excel File":
+    uploaded = st.file_uploader("Upload Monthly Billing File (.xlsx)", type=["xlsx"])
+    st.markdown('<div class="bp-upload-hint">Standard GoFleet / ZenduIT monthly billing export</div>', unsafe_allow_html=True)
+else:
+    uploaded = None
+    st.markdown('<div style="background:#f0f9ff;border:1px solid #bae6fd;border-left:4px solid #0284c7;border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.75rem;"><div style="font-size:0.82rem;font-weight:600;color:#0284c7;margin-bottom:0.2rem;">Zoho Books Integration</div><div style="font-size:0.78rem;color:#0c4a6e;">Pulling live invoice data directly from your Zoho Books account. No manual export needed.</div></div>', unsafe_allow_html=True)
+    if st.button("Pull from Zoho Books"):
+        with st.spinner("Connecting to Zoho Books..."):
+            try:
+                from zoho_connector import load_from_zoho
+                zoho_df, zoho_count = load_from_zoho()
+                st.session_state["zoho_df"] = zoho_df
+                st.success(f"Pulled {zoho_count} invoices from Zoho Books.")
+            except Exception as e:
+                st.error(f"Zoho connection error: {e}")
+
+if uploaded or "zoho_df" in st.session_state:
     try:
-        df, sheet_used = load_data(uploaded)
+        if uploaded:
+            df, sheet_used = load_data(uploaded)
+        else:
+            df = st.session_state["zoho_df"]
         flags = run_validations(df)
         counts = flags["Risk Level"].value_counts().to_dict()
         n_critical = counts.get("Critical",0); n_high = counts.get("High",0)
