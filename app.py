@@ -130,6 +130,9 @@ st.markdown("""
     [data-testid="stFileUploadDropzone"] { background: #ffffff !important; }
     [data-testid="stFileUploadDropzone"] p, [data-testid="stFileUploadDropzone"] span { color: #64748b !important; }
     .stMultiSelect label, .stMultiSelect label p { color: #0f172a !important; font-weight: 600 !important; }
+    [data-testid="stRadio"] label p { color: #0f172a !important; font-weight: 500 !important; }
+    [data-testid="stWidgetLabel"] p { color: #0f172a !important; font-weight: 600 !important; }
+    [data-testid="stRadio"] > div { gap: 1.5rem !important; }
     .stMarkdown p { color: #334155; }
     .bp-section-line { flex: 1; height: 1px; background: #e2e8f0; }
 
@@ -616,20 +619,61 @@ if uploaded or "zoho_df" in st.session_state:
         severity_filter = st.multiselect("Filter by severity",
             options=["Critical","High","Medium","Low"],
             default=["Critical","High","Medium","Low"])
-        filtered = flags[flags["Risk Level"].isin(severity_filter)]
+        filtered = flags[flags["Risk Level"].isin(severity_filter)].copy()
 
-        rows_detail = ""
-        for _, r in filtered.iterrows():
-            badge = f'<span class="badge {badge_map.get(r["Risk Level"],"")} ">{r["Risk Level"]}</span>'
-            rows_detail += f'<tr onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">'
-            rows_detail += f'<td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#0f172a;font-size:0.85rem;white-space:nowrap;">{r["Customer"]}</td>'
-            rows_detail += f'<td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;color:#3b82f6;font-family:monospace;font-size:0.75rem;font-weight:600;">R{r["Rule #"]}</td>'
-            rows_detail += f'<td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;color:#334155;font-size:0.85rem;white-space:nowrap;">{r["Rule"]}</td>'
-            rows_detail += f'<td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;">{badge}</td>'
-            rows_detail += f'<td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;color:#475569;font-size:0.83rem;">{r["Description"]}</td>'
-            rows_detail += f'<td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;color:#475569;font-size:0.83rem;">{r["Recommended Action"]}</td></tr>'
+        # ── STATUS TRACKER ──
+        if "exception_status" not in st.session_state:
+            st.session_state["exception_status"] = {
+                f"{r['Customer']}_{r['Rule #']}": "Open"
+                for _, r in flags.iterrows()
+            }
 
-        st.markdown(f'<div class="bp-table-wrap"><div class="bp-table-inner" style="max-height:460px;"><table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f8fafc;position:sticky;top:0;z-index:1;"><th style="padding:10px 16px;text-align:left;font-size:0.67rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #e2e8f0;">Customer</th><th style="padding:10px 16px;text-align:left;font-size:0.67rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #e2e8f0;">Rule</th><th style="padding:10px 16px;text-align:left;font-size:0.67rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #e2e8f0;">Name</th><th style="padding:10px 16px;text-align:left;font-size:0.67rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #e2e8f0;">Severity</th><th style="padding:10px 16px;text-align:left;font-size:0.67rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #e2e8f0;">Description</th><th style="padding:10px 16px;text-align:left;font-size:0.67rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.08em;border-bottom:2px solid #e2e8f0;">Recommended Action</th></tr></thead><tbody>{rows_detail}</tbody></table></div></div>', unsafe_allow_html=True)
+        filtered["Status"] = filtered.apply(
+            lambda r: st.session_state["exception_status"].get(
+                f"{r['Customer']}_{r['Rule #']}", "Open"
+            ), axis=1
+        )
+
+        display_df = filtered[["Customer", "Rule #", "Rule", "Risk Level", "Description", "Recommended Action", "Status"]].copy()
+
+        edited = st.data_editor(
+            display_df,
+            column_config={
+                "Status": st.column_config.SelectboxColumn(
+                    "Status",
+                    options=["Open", "In Progress", "Resolved"],
+                    required=True,
+                    width="small",
+                ),
+                "Risk Level": st.column_config.TextColumn("Severity", width="small"),
+                "Rule #": st.column_config.NumberColumn("Rule", format="R%d", width="small"),
+                "Rule": st.column_config.TextColumn("Name", width="medium"),
+                "Description": st.column_config.TextColumn("Description", width="large"),
+                "Recommended Action": st.column_config.TextColumn("Action", width="large"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=460,
+            disabled=["Customer", "Rule #", "Rule", "Risk Level", "Description", "Recommended Action"],
+        )
+
+        # Save status changes back to session state
+        for _, r in edited.iterrows():
+            key = f"{r['Customer']}_{r['Rule #']}"
+            st.session_state["exception_status"][key] = r["Status"]
+
+        # Resolution progress summary
+        all_statuses = list(st.session_state["exception_status"].values())
+        resolved = all_statuses.count("Resolved")
+        in_progress = all_statuses.count("In Progress")
+        open_count = all_statuses.count("Open")
+        st.markdown(f"""
+        <div style="display:flex;gap:0.75rem;margin-top:0.75rem;flex-wrap:wrap;">
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:0.5rem 1rem;font-size:0.8rem;color:#dc2626;font-weight:600;">Open: {open_count}</div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:0.5rem 1rem;font-size:0.8rem;color:#d97706;font-weight:600;">In Progress: {in_progress}</div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:0.5rem 1rem;font-size:0.8rem;color:#166534;font-weight:600;">Resolved: {resolved}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.download_button("Download Exception Report (Excel)", data=to_excel(flags),
