@@ -634,7 +634,7 @@ if uploaded or "zoho_df" in st.session_state:
             ), axis=1
         )
 
-        display_df = filtered[["Customer", "Rule #", "Rule", "Risk Level", "Description", "Recommended Action", "Status"]].copy()
+        display_df = filtered[["Status", "Customer", "Rule #", "Rule", "Risk Level", "Description", "Recommended Action"]].copy()
 
         edited = st.data_editor(
             display_df,
