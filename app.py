@@ -131,6 +131,7 @@ st.markdown("""
     [data-testid="stFileUploadDropzone"] p, [data-testid="stFileUploadDropzone"] span { color: #64748b !important; }
     .stMultiSelect label, .stMultiSelect label p { color: #0f172a !important; font-weight: 600 !important; }
     [data-testid="stRadio"] label p { color: #0f172a !important; font-weight: 500 !important; }
+    [data-testid="stAlert"] p, [data-testid="stAlert"] div { color: #0f172a !important; }
     [data-testid="stWidgetLabel"] p { color: #0f172a !important; font-weight: 600 !important; }
     [data-testid="stRadio"] > div { gap: 1.5rem !important; }
     .stMarkdown p { color: #334155; }
@@ -573,7 +574,8 @@ if uploaded or "zoho_df" in st.session_state:
 
         with col3:
             cs_flags = flags.merge(df[["Customer","CS Owner"]], on="Customer", how="left")
-            cs_flags["CS Owner"] = cs_flags["CS Owner"].fillna("Unassigned")
+            cs_flags["CS Owner"] = cs_flags["CS Owner"].astype(str).str.strip()
+            cs_flags["CS Owner"] = cs_flags["CS Owner"].replace(["", "nan", "None"], "Unassigned")
             cs_counts = cs_flags.groupby("CS Owner").size().sort_values(ascending=True)
             fig_cs = go.Figure(go.Bar(
                 x=cs_counts.values,
@@ -634,7 +636,7 @@ if uploaded or "zoho_df" in st.session_state:
             ), axis=1
         )
 
-        display_df = filtered[["Status", "Customer", "Rule #", "Rule", "Risk Level", "Description", "Recommended Action"]].copy()
+        display_df = filtered[["Customer", "Rule #", "Rule", "Risk Level", "Description", "Recommended Action", "Status"]].copy()
 
         edited = st.data_editor(
             display_df,
